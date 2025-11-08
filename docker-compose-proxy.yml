@@ -1,0 +1,39 @@
+
+services:
+  wireguard-app:
+    build: .
+    container_name: wireguard-go-app-proxy
+    env_file:
+      - .env.proxy
+    cap_add:
+      - NET_ADMIN
+      - SYS_PTRACE
+    security_opt:
+      - seccomp:unconfined
+    devices:
+      - /dev/net/tun
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /lib/modules:/lib/modules:ro
+    ports:
+      - "8080:8080"  # Admin interface
+      - "80:80"      # Expose HTTP to public
+      #- "443:443"    # Expose HTTPS to public
+      #- "8082:8082"  # Additional services
+    networks:
+      - vpn-network
+      - public-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  vpn-network:
+    name: vpn-network
+    driver: bridge
+  public-network:
+    name: public-network
+    driver: bridge

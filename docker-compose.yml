@@ -1,0 +1,59 @@
+services:
+  wireguard-app:
+    build: .
+    container_name: wireguard-go-app
+    env_file:
+      - .env
+    cap_add:
+      - NET_ADMIN
+      - SYS_PTRACE
+    security_opt:
+      - seccomp:unconfined
+    devices:
+      - /dev/net/tun
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /lib/modules:/lib/modules:ro
+    ports:
+      - "8080:8080"
+    networks:
+      - vpn-network
+      - public-network
+    restart: unless-stopped
+    # Optional: Add health check
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      dummy-service:
+        condition: service_healthy
+
+  dummy-service:
+    image: nginx:alpine
+    container_name: dummy
+    networks:
+      - vpn-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  vpn-network:
+    name: vpn-network
+    driver: bridge
+    #ipam:
+    #  config:
+    #    - subnet: 172.20.0.0/16
+
+  public-network:
+    name: public-network
+    driver: bridge
+    #ipam:
+    #  config:
+    #    - subnet: 172.21.0.0/16

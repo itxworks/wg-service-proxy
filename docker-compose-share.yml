@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  wireguard-app:
+    build: .
+    container_name: wireguard-go-app-share
+    env_file:
+      - .env.share  # Use share mode env file
+    cap_add:
+      - NET_ADMIN
+      - SYS_PTRACE
+    security_opt:
+      - seccomp:unconfined
+    devices:
+      - /dev/net/tun
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /lib/modules:/lib/modules:ro
+    ports:
+      - "8080:8080"  # Admin interface
+    networks:
+      - vpn-network
+      - app-network  # Additional network for dummy service
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  dummy-service:
+    image: nginx:alpine
+    container_name: dummy-service
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - ./dummy-html:/usr/share/nginx/html:ro
+
+networks:
+  vpn-network:
+    name: vpn-network
+    driver: bridge
+  app-network:
+    name: app-network
+    driver: bridge
